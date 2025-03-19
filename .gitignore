@@ -4,6 +4,7 @@ composer.lock
 .phpunit.result.cache
 /phpunit.xml
 vendor/*
+.idea
 
 /node_modules/
 npm-debug.log

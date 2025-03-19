@@ -17,6 +17,22 @@ class TextEditorField {
         this.#processRequiredAttribute();
         this.#enableFormChangesDetection();
         this.#handleFormSubmission();
+        this.#processHeading()
+    }
+
+    #processHeading() {
+        Array.from(["h1", "h2", "h3", "h4", "h5", "h6"]).forEach((tagName, i) => {
+            Trix.config.blockAttributes[`heading${(i + 1)}`] = {
+                tagName: tagName,
+                terminal: true,
+                breakOnReturn: true,
+                group: false
+            }
+        })
+
+        addEventListener("trix-initialize", function (event) {
+            new RichText(event.target)
+        })
     }
 
     #processRequiredAttribute() {
@@ -168,5 +184,67 @@ class TextEditorField {
         }
 
         return intoObject;
+    }
+}
+
+class RichText {
+    constructor(element) {
+        this.element = element
+        this.insertHeadingElements()
+    }
+
+    insertHeadingElements() {
+        this.removeOriginalHeadingButton()
+        this.insertNewHeadingButton()
+        this.insertHeadingDialog()
+    }
+
+    removeOriginalHeadingButton() {
+        this.buttonGroupBlockTools.removeChild(this.originalHeadingButton)
+    }
+
+    insertNewHeadingButton() {
+        this.buttonGroupBlockTools.insertAdjacentHTML("afterbegin", this.headingButtonTemplate)
+    }
+
+    insertHeadingDialog() {
+        this.dialogsElement.insertAdjacentHTML("beforeend", this.dialogHeadingTemplate)
+    }
+
+    get buttonGroupBlockTools() {
+        return this.toolbarElement.querySelector("[data-trix-button-group=block-tools]")
+    }
+
+    get dialogsElement() {
+        return this.toolbarElement.querySelector("[data-trix-dialogs]")
+    }
+
+    get originalHeadingButton() {
+        return this.toolbarElement.querySelector("[data-trix-attribute=heading1]")
+    }
+
+    get toolbarElement() {
+        return this.element.toolbarElement
+    }
+
+    get headingButtonTemplate() {
+        return '<button type="button" class="trix-button trix-button--icon trix-button--icon-heading-1" data-trix-action="x-heading" title="Heading" tabindex="-1">Heading</button>'
+    }
+
+    get dialogHeadingTemplate() {
+        return `
+      <div class="trix-dialog trix-dialog--heading" data-trix-dialog="x-heading" data-trix-dialog-attribute="x-heading">
+        <div class="trix-dialog__link-fields">
+          <div class="trix-button-group">
+            <button type="button" class="trix-button trix-button--dialog" data-trix-attribute="heading1">H1</button>
+            <button type="button" class="trix-button trix-button--dialog" data-trix-attribute="heading2">H2</button>
+            <button type="button" class="trix-button trix-button--dialog" data-trix-attribute="heading3">H3</button>
+            <button type="button" class="trix-button trix-button--dialog" data-trix-attribute="heading4">H4</button>
+            <button type="button" class="trix-button trix-button--dialog" data-trix-attribute="heading5">H5</button>
+            <button type="button" class="trix-button trix-button--dialog" data-trix-attribute="heading6">H6</button>
+          </div>
+        </div>
+      </div>
+    `
     }
 }
