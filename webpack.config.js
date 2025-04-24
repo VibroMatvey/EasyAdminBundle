@@ -33,6 +33,7 @@ Encore
     .addEntry('field-image', './assets/js/field-image.js')
     .addEntry('field-slug', './assets/js/field-slug.js')
     .addEntry('field-textarea', './assets/js/field-textarea.js')
+    .addEntry('field-map', './assets/js/field-map.js')
     .addEntry('field-text-editor', './assets/js/field-text-editor.js')
     .addEntry('login', './assets/js/login.js')
 ;

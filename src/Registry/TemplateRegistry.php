@@ -44,6 +44,7 @@ final class TemplateRegistry
         'crud/field/language' => '@EasyAdmin/crud/field/language.html.twig',
         'crud/field/locale' => '@EasyAdmin/crud/field/locale.html.twig',
         'crud/field/money' => '@EasyAdmin/crud/field/money.html.twig',
+        'crud/field/map' => '@EasyAdmin/crud/field/map.html.twig',
         'crud/field/number' => '@EasyAdmin/crud/field/number.html.twig',
         'crud/field/percent' => '@EasyAdmin/crud/field/percent.html.twig',
         'crud/field/raw' => '@EasyAdmin/crud/field/raw.html.twig',

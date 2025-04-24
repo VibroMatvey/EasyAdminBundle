@@ -61,6 +61,11 @@
         "/field-textarea.74319bb1.js"
       ]
     },
+    "field-map": {
+      "js": [
+        "/field-map.87644fb3.js"
+      ]
+    },
     "field-text-editor": {
       "css": [
         "/field-text-editor.3e54a255.css"
