@@ -35,7 +35,6 @@ final class FormFactory
         $formOptions->set('attr.class', trim(($formOptions->get('attr.class') ?? '').' '.$cssClass));
         $formOptions->set('attr.id', sprintf('edit-%s-form', $entityDto->getName()));
         $formOptions->set('entityDto', $entityDto);
-        $formOptions->set('csrf_token_id', '');
         $formOptions->setIfNotSet('translation_domain', $context->getI18n()->getTranslationDomain());
 
         return $this->symfonyFormFactory->createNamedBuilder($entityDto->getName(), CrudFormType::class, $entityDto->getInstance(), $formOptions->all());
@@ -52,7 +51,6 @@ final class FormFactory
         $formOptions->set('attr.class', trim(($formOptions->get('attr.class') ?? '').' '.$cssClass));
         $formOptions->set('attr.id', sprintf('new-%s-form', $entityDto->getName()));
         $formOptions->set('entityDto', $entityDto);
-        $formOptions->set('csrf_token_id', '');
         $formOptions->setIfNotSet('translation_domain', $context->getI18n()->getTranslationDomain());
 
         return $this->symfonyFormFactory->createNamedBuilder($entityDto->getName(), CrudFormType::class, $entityDto->getInstance(), $formOptions->all());

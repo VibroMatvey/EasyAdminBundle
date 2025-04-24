@@ -50,6 +50,8 @@ final class ControllerFactory
             return null;
         }
 
+        // needed to fix the double encoding of URLs that might happen (https://github.com/EasyCorp/EasyAdminBundle/pull/6902)
+        $controllerFqcn = str_replace('%5C', '\\', $controllerFqcn);
         $newRequest = $request->duplicate(null, null, ['_controller' => [$controllerFqcn, $controllerAction]]);
         try {
             $controllerCallable = $this->controllerResolver->getController($newRequest);
