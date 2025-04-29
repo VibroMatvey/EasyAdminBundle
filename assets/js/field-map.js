@@ -178,7 +178,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 this.pendingPoint.objectId = selectedValue || null;
                 this.pendingPoint.objectName = objectName;
                 if (selectedValue) this.selectedObjects.add(selectedValue);
-                console.debug('Adding point:', this.pendingPoint); // Debugging
+                console.debug('Adding point:', this.pendingPoint);
                 this.points.get(this.pendingPoint.imageId).push(this.pendingPoint);
                 this.pendingPoint.draw();
                 this.saveState(this.pendingPoint.imageId);
@@ -188,7 +188,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 area.objectId = selectedValue || null;
                 area.objectName = objectName;
                 if (selectedValue) this.selectedObjects.add(selectedValue);
-                console.debug('Updating area:', area); // Debugging
+                console.debug('Updating area:', area);
                 this.pendingArea.draw();
                 this.saveState(this.pendingArea.imageId);
                 this.pendingArea = null;
@@ -225,7 +225,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const previewContainer = this.createPreviewContainer();
             const img = new Image();
-            img.src = `/uploads/maps/${filename}`;
+            img.src = `/Uploads/maps/${filename}`;
             img.onload = () => {
                 this.processImage(img, mapContainer, previewContainer);
                 this.createModeButtons(mapContainer);
@@ -440,7 +440,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                             ctx.font = '12px Arial';
                             ctx.fillStyle = 'black';
                             ctx.fillText(point.objectName, point.x + 8, point.y - 8);
-                            console.debug(`Rendering point with name: ${point.objectName}`); // Debugging
+                            console.debug(`Rendering point with name: ${point.objectName}`);
                         }
                     });
                 }
@@ -471,7 +471,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                                 ctx.font = '12px Arial';
                                 ctx.fillStyle = 'black';
                                 ctx.fillText(area.objectName, points[0].x + 8, points[0].y - 8);
-                                console.debug(`Rendering area with name: ${area.objectName}`); // Debugging
+                                console.debug(`Rendering area with name: ${area.objectName}`);
                             }
                         }
                     });
@@ -500,7 +500,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         }
 
         setupCanvasEvents(canvas, imageId, draw, previewContainer) {
+            // Handle clicks on the canvas
             canvas.addEventListener('click', (event) => {
+                event.stopPropagation(); // Prevent canvas clicks from triggering document listener
                 const {x, y} = this.getCanvasCoordinates(event, canvas);
                 if (this.drawMode === 'points') {
                     this.handlePointModeClick(imageId, x, y, draw, previewContainer);
@@ -511,13 +513,31 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 this.saveState(imageId);
             });
 
+            // Handle right-clicks on the canvas
             canvas.addEventListener('contextmenu', (event) => {
                 event.preventDefault();
+                event.stopPropagation(); // Prevent right-clicks from triggering document listener
                 if (this.drawMode === 'areas') {
                     this.handleAreaModeRightClick(imageId, draw, previewContainer);
                     draw();
                     this.saveState(imageId);
                 }
+            });
+
+            // Handle clicks outside the canvas to complete area
+            const outsideClickHandler = (event) => {
+                if (!canvas.contains(event.target) && this.drawMode === 'areas' && !this.modal.contains(event.target)) {
+                    this.handleAreaModeRightClick(imageId, draw, previewContainer);
+                    draw();
+                    this.saveState(imageId);
+                }
+            };
+
+            document.addEventListener('click', outsideClickHandler);
+
+            // Cleanup listener when canvas is removed (optional, to prevent memory leaks)
+            canvas.addEventListener('remove', () => {
+                document.removeEventListener('click', outsideClickHandler);
             });
         }
 
@@ -573,9 +593,17 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const currentAreas = this.areas.get(imageId);
             if (currentAreas.length && !currentAreas[currentAreas.length - 1].completed) {
                 const areaIndex = currentAreas.length - 1;
-                currentAreas[areaIndex].completed = true;
-                this.pendingArea = {imageId, index: areaIndex, draw, previewContainer};
-                this.showModal();
+                // Only complete the area if it has at least 3 points to form a valid polygon
+                if (currentAreas[areaIndex].points.length >= 3) {
+                    currentAreas[areaIndex].completed = true;
+                    this.pendingArea = {imageId, index: areaIndex, draw, previewContainer};
+                    this.showModal();
+                } else {
+                    // If less than 3 points, remove the incomplete area
+                    currentAreas.splice(areaIndex, 1);
+                    draw();
+                    this.saveState(imageId);
+                }
             }
         }
     }
