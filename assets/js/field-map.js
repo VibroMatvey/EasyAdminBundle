@@ -9,6 +9,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.selectedObjects = new Set();
             this.pendingPoint = null;
             this.pendingArea = null;
+            this.youAreHerePoint = null;
             this.domCache = {};
             this.init();
         }
@@ -27,12 +28,17 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 fileInputs: document.querySelectorAll('#Map_map_file_file'),
                 pointsField: document.getElementById('Map_map_points'),
                 areasField: document.getElementById('Map_map_areas'),
-                objectsField: document.getElementById('Map_map_objects')
+                objectsField: document.getElementById('Map_map_objects'),
+                youAreHereField: document.getElementById('Map_map_youAreHere')
             };
         }
 
         handleError(message, error = null) {
             console.error(`ImageMapEditor Error: ${message}`, error || '');
+        }
+
+        showWarning(message) {
+            alert(message);
         }
 
         setupFileInputs() {
@@ -68,7 +74,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                         </div>
                         <div class="modal-body">
                             <select class="form-select form-select-sm mb-4 mt-3" id="objectSelect" autocomplete="off">
-                                <option value="" selected>Без привязки</option>
                             </select>
                         </div>
                         <div class="modal-footer">
@@ -91,7 +96,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 this.objectSelect = new TomSelect(objectSelect, {
                     maxOptions: null,
                     placeholder: 'Выберите...',
-                    allowEmptyOption: true,
+                    allowEmptyOption: false,
                     searchField: ['text'],
                     render: {
                         option: (data, escape) => `<div>${escape(data.text)}</div>`,
@@ -117,7 +122,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             if (this.objectSelect) {
                 this.objectSelect.clear();
                 this.objectSelect.clearOptions();
-                this.objectSelect.addOption({value: '', text: 'Без привязки'});
                 this.objectSelect.addOptions(
                     objects
                         .filter(obj => !this.selectedObjects.has(obj.id))
@@ -125,7 +129,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 );
                 this.objectSelect.refreshOptions();
             } else {
-                select.innerHTML = '<option value="">Без привязки</option>';
+                select.innerHTML = '';
                 objects
                     .filter(obj => !this.selectedObjects.has(obj.id))
                     .forEach(obj => {
@@ -168,16 +172,29 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 return;
             }
             const selectedValue = this.objectSelect ? this.objectSelect.getValue() : select.value;
+            if (!selectedValue) {
+                this.showWarning('Необходимо выбрать объект для точки или области!');
+                if (this.pendingArea) {
+                    const currentAreas = this.areas.get(this.pendingArea.imageId);
+                    currentAreas.splice(this.pendingArea.index, 1);
+                    this.pendingArea.draw();
+                    this.saveState(this.pendingArea.imageId);
+                    this.pendingArea = null;
+                }
+                this.hideModal();
+                return;
+            }
+
             const selectedText = this.objectSelect
                 ? this.objectSelect.getOption(selectedValue)?.textContent
                 : select.selectedOptions[0]?.text;
 
-            const objectName = selectedText !== 'Без привязки' ? selectedText : null;
+            const objectName = selectedText || null;
 
             if (this.pendingPoint) {
-                this.pendingPoint.objectId = selectedValue || null;
+                this.pendingPoint.objectId = selectedValue;
                 this.pendingPoint.objectName = objectName;
-                if (selectedValue) this.selectedObjects.add(selectedValue);
+                this.selectedObjects.add(selectedValue);
                 console.debug('Adding point:', this.pendingPoint);
                 this.points.get(this.pendingPoint.imageId).push(this.pendingPoint);
                 this.pendingPoint.draw();
@@ -185,9 +202,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 this.pendingPoint = null;
             } else if (this.pendingArea) {
                 const area = this.areas.get(this.pendingArea.imageId)[this.pendingArea.index];
-                area.objectId = selectedValue || null;
+                area.objectId = selectedValue;
                 area.objectName = objectName;
-                if (selectedValue) this.selectedObjects.add(selectedValue);
+                this.selectedObjects.add(selectedValue);
                 console.debug('Updating area:', area);
                 this.pendingArea.draw();
                 this.saveState(this.pendingArea.imageId);
@@ -260,9 +277,11 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const pointsButton = this.createModeButton('Точки', 'points');
             const areasButton = this.createModeButton('Область', 'areas');
+            const youAreHereButton = this.createModeButton('Вы здесь', 'youAreHere');
 
             buttonContainer.appendChild(pointsButton);
             buttonContainer.appendChild(areasButton);
+            buttonContainer.appendChild(youAreHereButton);
             this.domCache.imageContainer.insertBefore(buttonContainer, mapContainer);
         }
 
@@ -282,8 +301,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         updateModeButtons() {
             const buttons = this.domCache.imageContainer?.querySelectorAll('.mode-buttons .btn');
             buttons?.forEach(button => {
-                button.classList.toggle('btn-primary', button.textContent === (this.drawMode === 'points' ? 'Точки' : 'Область'));
-                button.classList.toggle('btn-secondary', button.textContent !== (this.drawMode === 'points' ? 'Точки' : 'Область'));
+                const isActive = button.textContent === (this.drawMode === 'points' ? 'Точки' : this.drawMode === 'areas' ? 'Область' : 'Вы здесь');
+                button.classList.toggle('btn-primary', isActive);
+                button.classList.toggle('btn-secondary', !isActive);
             });
         }
 
@@ -311,6 +331,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.points.clear();
             this.areas.clear();
             this.selectedObjects.clear();
+            this.youAreHerePoint = null;
 
             Array.from(files).forEach(file => {
                 if (file.type.startsWith('image/')) {
@@ -353,41 +374,60 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const objects = JSON.parse(this.domCache.objectsField?.value || '[]');
             try {
                 const savedPoints = JSON.parse(this.domCache.pointsField?.value || '[]');
-                savedPoints.forEach(point => {
-                    const obj = objects.find(o => o.id === point.objectId);
-                    if (point.objectId) this.selectedObjects.add(point.objectId);
-                    this.points.get(imageId).push({
-                        x: point.x,
-                        y: point.y,
-                        objectId: point.objectId || null,
-                        objectName: obj ? (obj.name || obj.id) : null,
-                        imageId,
-                        draw,
-                        previewContainer
+                savedPoints
+                    .filter(point => point.objectId)
+                    .forEach(point => {
+                        const obj = objects.find(o => o.id === point.objectId);
+                        if (point.objectId) this.selectedObjects.add(point.objectId);
+                        this.points.get(imageId).push({
+                            x: point.x,
+                            y: point.y,
+                            objectId: point.objectId,
+                            objectName: obj ? (obj.name || obj.id) : null,
+                            imageId,
+                            draw,
+                            previewContainer
+                        });
                     });
-                });
             } catch (error) {
                 this.handleError('Failed to parse Map_map_points', error);
             }
 
             try {
                 const savedAreas = JSON.parse(this.domCache.areasField?.value || '[]');
-                savedAreas.forEach(area => {
-                    const areaPoints = Array.isArray(area.points) ? area.points : [];
-                    const obj = objects.find(o => o.id === area.objectId);
-                    if (areaPoints.length > 0) {
-                        this.areas.get(imageId).push({
-                            points: areaPoints,
-                            objectId: area.objectId || null,
-                            objectName: obj ? (obj.name || obj.id) : null,
-                            completed: true,
-                            draw,
-                            previewContainer
-                        });
-                    }
-                });
+                savedAreas
+                    .filter(area => area.objectId)
+                    .forEach(area => {
+                        const areaPoints = Array.isArray(area.points) ? area.points : [];
+                        const obj = objects.find(o => o.id === area.objectId);
+                        if (areaPoints.length > 0) {
+                            this.areas.get(imageId).push({
+                                points: areaPoints,
+                                objectId: area.objectId,
+                                objectName: obj ? (obj.name || obj.id) : null,
+                                completed: true,
+                                draw,
+                                previewContainer
+                            });
+                        }
+                    });
             } catch (error) {
                 this.handleError('Failed to parse Map_map_areas', error);
+            }
+
+            try {
+                const savedYouAreHere = JSON.parse(this.domCache.youAreHereField?.value || '{}');
+                if (savedYouAreHere.x && savedYouAreHere.y) {
+                    this.youAreHerePoint = {
+                        x: savedYouAreHere.x,
+                        y: savedYouAreHere.y,
+                        imageId,
+                        draw,
+                        previewContainer
+                    };
+                }
+            } catch (error) {
+                this.handleError('Failed to parse Map_map_youAreHere', error);
             }
         }
 
@@ -476,6 +516,20 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                         }
                     });
                 }
+
+                if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
+                    ctx.beginPath();
+                    ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'green';
+                    ctx.fill();
+                    ctx.strokeStyle = 'black';
+                    ctx.stroke();
+
+                    ctx.font = '14px Arial';
+                    ctx.fillStyle = 'black';
+                    ctx.fillText('Вы здесь', this.youAreHerePoint.x + 10, this.youAreHerePoint.y - 10);
+                    console.debug('Rendering You Are Here point');
+                }
             };
         }
 
@@ -493,30 +547,37 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 areas: this.areas.get(imageId).filter(area => area.points.length > 0).map(area => ({
                     points: area.points,
                     objectId: area.objectId
-                }))
+                })),
+                youAreHere: this.youAreHerePoint && this.youAreHerePoint.imageId === imageId ? {
+                    x: this.youAreHerePoint.x,
+                    y: this.youAreHerePoint.y
+                } : null
             };
             this.domCache.pointsField.value = JSON.stringify(state.points);
             this.domCache.areasField.value = JSON.stringify(state.areas);
+            if (this.domCache.youAreHereField) {
+                this.domCache.youAreHereField.value = JSON.stringify(state.youAreHere);
+            }
         }
 
         setupCanvasEvents(canvas, imageId, draw, previewContainer) {
-            // Handle clicks on the canvas
             canvas.addEventListener('click', (event) => {
-                event.stopPropagation(); // Prevent canvas clicks from triggering document listener
+                event.stopPropagation();
                 const {x, y} = this.getCanvasCoordinates(event, canvas);
                 if (this.drawMode === 'points') {
                     this.handlePointModeClick(imageId, x, y, draw, previewContainer);
-                } else {
+                } else if (this.drawMode === 'areas') {
                     this.handleAreaModeClick(imageId, x, y);
+                } else if (this.drawMode === 'youAreHere') {
+                    this.handleYouAreHereClick(imageId, x, y, draw, previewContainer);
                 }
                 draw();
                 this.saveState(imageId);
             });
 
-            // Handle right-clicks on the canvas
             canvas.addEventListener('contextmenu', (event) => {
                 event.preventDefault();
-                event.stopPropagation(); // Prevent right-clicks from triggering document listener
+                event.stopPropagation();
                 if (this.drawMode === 'areas') {
                     this.handleAreaModeRightClick(imageId, draw, previewContainer);
                     draw();
@@ -524,7 +585,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 }
             });
 
-            // Handle clicks outside the canvas to complete area
             const outsideClickHandler = (event) => {
                 if (!canvas.contains(event.target) && this.drawMode === 'areas' && !this.modal.contains(event.target)) {
                     this.handleAreaModeRightClick(imageId, draw, previewContainer);
@@ -535,7 +595,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             document.addEventListener('click', outsideClickHandler);
 
-            // Cleanup listener when canvas is removed (optional, to prevent memory leaks)
             canvas.addEventListener('remove', () => {
                 document.removeEventListener('click', outsideClickHandler);
             });
@@ -556,12 +615,31 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 if (Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2) < 10) {
                     if (point.objectId) this.selectedObjects.delete(point.objectId);
                     currentPoints.splice(i, 1);
+                    draw();
+                    this.saveState(imageId);
                     return;
                 }
             }
 
             this.pendingPoint = {x, y, imageId, draw, previewContainer};
             this.showModal();
+        }
+
+        handleYouAreHereClick(imageId, x, y, draw, previewContainer) {
+            if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
+                // Если кликнули рядом с точкой "Вы здесь", удаляем её
+                if (Math.sqrt((this.youAreHerePoint.x - x) ** 2 + (this.youAreHerePoint.y - y) ** 2) < 10) {
+                    this.youAreHerePoint = null;
+                    draw();
+                    this.saveState(imageId);
+                    return;
+                }
+            } else {
+                // Создаем новую точку "Вы здесь"
+                this.youAreHerePoint = {x, y, imageId, draw, previewContainer};
+                draw();
+                this.saveState(imageId);
+            }
         }
 
         handleAreaModeClick(imageId, x, y) {
@@ -593,13 +671,11 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const currentAreas = this.areas.get(imageId);
             if (currentAreas.length && !currentAreas[currentAreas.length - 1].completed) {
                 const areaIndex = currentAreas.length - 1;
-                // Only complete the area if it has at least 3 points to form a valid polygon
                 if (currentAreas[areaIndex].points.length >= 3) {
                     currentAreas[areaIndex].completed = true;
                     this.pendingArea = {imageId, index: areaIndex, draw, previewContainer};
                     this.showModal();
                 } else {
-                    // If less than 3 points, remove the incomplete area
                     currentAreas.splice(areaIndex, 1);
                     draw();
                     this.saveState(imageId);
