@@ -44,6 +44,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\ImageConfigurator;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\IntegerConfigurator;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\LanguageConfigurator;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\LocaleConfigurator;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\MapConfigurator;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\MoneyConfigurator;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\NumberConfigurator;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Configurator\PercentConfigurator;
@@ -328,6 +329,8 @@ return static function (ContainerConfigurator $container) {
             ->tag('form.type', ['alias' => 'ea_crud'])
 
         ->set(ArrayConfigurator::class)
+        ->set(MapConfigurator::class)
+            ->arg(0, service('doctrine.orm.default_entity_manager'))
 
         ->set(AssociationConfigurator::class)
             ->arg(0, new Reference(EntityFactory::class))

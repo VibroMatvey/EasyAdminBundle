@@ -2,7 +2,6 @@
 
 namespace EasyCorp\Bundle\EasyAdminBundle\Form\Type;
 
-use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Field\MapField;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Event\PreSubmitEvent;
@@ -16,20 +15,17 @@ class MapFormType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        if ($options['objectFqcn'] === null) {
-            throw new InvalidArgumentException('objectFqcn option must be set.');
+        if ($options['objectTitlePropertyName'] === null) {
+            throw new InvalidArgumentException('objectTitlePropertyName option must be set.');
         }
-        if ($options['entityManager'] === null) {
-            throw new InvalidArgumentException('entityManager option must be set.');
+        if ($options['objectIdentifierPropertyName'] === null) {
+            throw new InvalidArgumentException('objectIdentifierPropertyName option must be set.');
         }
-        if ($options['objectDisplayName'] === null) {
-            throw new InvalidArgumentException('objectDisplayName option must be set.');
+        if ($options['objectMapPropertyName'] === null) {
+            throw new InvalidArgumentException('objectMapPropertyName option must be set.');
         }
-        if ($options['objectDisplayIdentifier'] === null) {
-            throw new InvalidArgumentException('objectDisplayIdentifier option must be set.');
-        }
-        if (!class_exists($options['objectFqcn'])) {
-            throw new InvalidArgumentException('Class does not exist: ' . $options['objectFqcn']);
+        if ($options['mapObjectsPropertyName'] === null) {
+            throw new InvalidArgumentException('mapObjectsPropertyName option must be set.');
         }
         if (!property_exists(new $options['objectFqcn'], 'point')) {
             throw new InvalidArgumentException('Point property does not exist: ' . $options['objectFqcn']);
@@ -37,49 +33,17 @@ class MapFormType extends AbstractType
         if (!property_exists(new $options['objectFqcn'], 'area')) {
             throw new InvalidArgumentException('Point property does not exist: ' . $options['objectFqcn']);
         }
-        $mapObjectsRepository = $options['entityManager']->getRepository($options['objectFqcn']);
-        if (!$mapObjectsRepository) {
-            throw new InvalidArgumentException('Repository for objectFqcn does not exist: ' . $options['objectFqcn']);
-        }
-        $identifierGetter = 'get' . ucfirst($options['objectDisplayIdentifier']);
-        if (!method_exists(new $options['objectFqcn'], $identifierGetter)) {
-            throw new InvalidArgumentException('Method ' . $identifierGetter . 'does not exist for objectFqcn: ' . $options['objectFqcn']);
-        }
-        $nameGetter = 'get' . ucfirst($options['objectDisplayName']);
-        if (!method_exists(new $options['objectFqcn'], $nameGetter)) {
-            throw new InvalidArgumentException('Method ' . $nameGetter . 'does not exist for objectFqcn: ' . $options['objectFqcn']);
-        }
-        $dbObjects = $mapObjectsRepository->findAll();
-        $points = [];
-        foreach ($dbObjects as $object) {
-            $point = $object->getPoint();
-            if ($point && is_array($point) && isset($point['x'], $point['y'])) {
-                $points[] = [
-                    'x' => $point['x'],
-                    'y' => $point['y'],
-                    'objectId' => $object->$identifierGetter()
-                ];
-            }
-        }
-        $areas = [];
-        foreach ($dbObjects as $object) {
-            $area = $object->getArea();
-            if ($area && is_array($area) && !empty($area)) {
-                $areas[] = [
-                    'points' => $area,
-                    'objectId' => $object->$identifierGetter()
-                ];
-            }
-        }
-        $objects = array_map(fn($object) => ['name' => $object->$nameGetter(), 'id' => $object->$identifierGetter()], $dbObjects);
         $builder
-            ->addEventListener(FormEvents::PRE_SUBMIT, function (PreSubmitEvent $event) use ($dbObjects, $mapObjectsRepository): void {
+            ->addEventListener(FormEvents::PRE_SUBMIT, function (PreSubmitEvent $event) use ($options): void {
+                $mapSetter = 'set' . ucfirst($options['objectMapPropertyName']);
+                $dbObjects = $options['objectRepository']->findBy([$options['objectMapPropertyName'] => $options['map']]);
                 $map = $event->getData();
 
                 foreach ($dbObjects as $mapObject) {
                     $mapObject->setPoint(null);
                     $mapObject->setArea(null);
-                    $mapObjectsRepository->save($mapObject);
+                    $mapObject->$mapSetter(null);
+                    $options['objectRepository']->save($mapObject);
                 }
 
                 if (key_exists('delete', $map['file'])) {
@@ -95,7 +59,7 @@ class MapFormType extends AbstractType
                     if (!$point['objectId']) {
                         continue;
                     }
-                    $mapObject = $mapObjectsRepository->find($point['objectId']);
+                    $mapObject = $options['objectRepository']->find($point['objectId']);
                     if (!$mapObject) {
                         continue;
                     }
@@ -103,42 +67,50 @@ class MapFormType extends AbstractType
                         "x" => $point['x'],
                         "y" => $point['y'],
                     ]);
+                    $mapObject->$mapSetter($options['map']);
                 }
 
                 foreach ($areas as $area) {
                     if (!$area['objectId']) {
                         continue;
                     }
-                    $mapObject = $mapObjectsRepository->find($area['objectId']);
+                    $mapObject = $options['objectRepository']->find($area['objectId']);
                     if (!$mapObject) {
                         continue;
                     }
                     $mapObject->setArea($area['points']);
+                    $mapObject->$mapSetter($options['map']);
                 }
             });
         $builder
             ->add('points', HiddenType::class, [
                 'required' => false,
                 'attr' => [
-                    'value' => json_encode($points),
+                    'value' => $options['points'],
+                    'mapped' => false,
+                    'map-data-id' => 'points'
                 ],
             ])
             ->add('areas', HiddenType::class, [
                 'required' => false,
                 'attr' => [
-                    'value' => json_encode($areas),
+                    'value' => $options['areas'],
+                    'mapped' => false,
+                    'map-data-id' => 'areas'
                 ],
             ])
             ->add('objects', HiddenType::class, [
                 'required' => false,
                 'attr' => [
-                    'value' => json_encode($objects),
+                    'value' => $options['objects'],
+                    'mapped' => false,
+                    'map-data-id' => 'objects'
                 ],
             ])
             ->add('youAreHere', HiddenType::class, [
                 'required' => false,
                 'attr' => [
-//                    'value' => json_encode($objects),
+                    'map-data-id' => 'youAreHere'
                 ],
             ])
             ->add('file', FileUploadType::class, [
@@ -146,7 +118,7 @@ class MapFormType extends AbstractType
                 'required' => false,
                 'upload_dir' => "public/" . MapField::UPLOAD_DIR,
                 'upload_filename' => "[ulid].[extension]",
-                'attr' => ['accept' => 'image/*'],
+                'attr' => ['accept' => 'image/*', 'map-data-id' => 'file'],
                 'allow_delete' => false
             ]);
     }
@@ -155,13 +127,19 @@ class MapFormType extends AbstractType
     {
         $resolver->setDefaults([
             'objectFqcn' => null,
-            'objectDisplayName' => null,
-            'objectDisplayIdentifier' => null,
-            'entityManager' => null,
+            'objectTitlePropertyName' => null,
+            'objectIdentifierPropertyName' => null,
+            'objectMapPropertyName' => null,
+            'mapObjectsPropertyName' => null,
+            'objectRepository' => null,
+            'points' => null,
+            'areas' => null,
+            'objects' => null,
+            'map' => null,
         ]);
-        $resolver->setAllowedTypes('objectFqcn', ['null', 'string']);
-        $resolver->setAllowedTypes('objectDisplayName', ['null', 'string']);
-        $resolver->setAllowedTypes('objectDisplayIdentifier', ['null', 'string']);
-        $resolver->setAllowedTypes('entityManager', ['null', EntityManagerInterface::class]);
+        $resolver->setAllowedTypes('objectTitlePropertyName', ['null', 'string']);
+        $resolver->setAllowedTypes('objectMapPropertyName', ['null', 'string']);
+        $resolver->setAllowedTypes('mapObjectsPropertyName', ['null', 'string']);
+        $resolver->setAllowedTypes('objectIdentifierPropertyName', ['null', 'string', 'int']);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace EasyCorp\Bundle\EasyAdminBundle\Field;
 
-use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Asset;
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Form\Type\MapFormType;
@@ -35,30 +34,30 @@ final class MapField implements FieldInterface
             );
     }
 
-    public function setObjectFqcn(string $entityFcn): self
+    public function setObjectTitlePropertyName(string $name): self
     {
-        $this->setFormTypeOption('objectFqcn', $entityFcn);
+        $this->setFormTypeOption('objectTitlePropertyName', $name);
 
         return $this;
     }
 
-    public function setEntityManager(EntityManagerInterface $entityManager): self
+    public function setObjectIdentifierPropertyName(string|int $name): self
     {
-        $this->setFormTypeOption('entityManager', $entityManager);
+        $this->setFormTypeOption('objectIdentifierPropertyName', $name);
 
         return $this;
     }
 
-    public function setObjectDisplayName(string $name): self
+    public function setMapObjectsPropertyName(string $name): self
     {
-        $this->setFormTypeOption('objectDisplayName', $name);
+        $this->setFormTypeOption('mapObjectsPropertyName', $name);
 
         return $this;
     }
 
-    public function setObjectIdentifier(string|int $identifier): self
+    public function setObjectMapPropertyName(string $name): self
     {
-        $this->setFormTypeOption('objectDisplayIdentifier', $identifier);
+        $this->setFormTypeOption('objectMapPropertyName', $name);
 
         return $this;
     }

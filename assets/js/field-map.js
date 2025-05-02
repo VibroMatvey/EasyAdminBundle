@@ -25,11 +25,11 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         cacheDomElements() {
             this.domCache = {
                 imageContainer: document.querySelector('.map-image'),
-                fileInputs: document.querySelectorAll('#Map_map_file_file'),
-                pointsField: document.getElementById('Map_map_points'),
-                areasField: document.getElementById('Map_map_areas'),
-                objectsField: document.getElementById('Map_map_objects'),
-                youAreHereField: document.getElementById('Map_map_youAreHere')
+                fileInputs: document.querySelectorAll('[map-data-id="file"]'),
+                pointsField: document.querySelector('[map-data-id="points"]'),
+                areasField: document.querySelector('[map-data-id="areas"]'),
+                objectsField: document.querySelector('[map-data-id="objects"]'),
+                youAreHereField: document.querySelector('[map-data-id="youAreHere"]')
             };
         }
 
