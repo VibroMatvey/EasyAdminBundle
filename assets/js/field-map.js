@@ -255,7 +255,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const previewContainer = this.createPreviewContainer();
             const img = new Image();
-            img.src = `/Uploads/maps/${filename}`;
+            img.src = `/uploads/maps/${filename}`;
             img.onload = () => {
                 this.processImage(img, mapContainer, previewContainer);
                 this.createModeButtons(mapContainer);
@@ -724,7 +724,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const rect = canvas.getBoundingClientRect();
             const x = (event.clientX - rect.left - this.originX) / this.scale;
             const y = (event.clientY - rect.top - this.originY) / this.scale;
-            return { x, y };
+            return {x, y};
         }
 
         handlePointModeClick(imageId, x, y, draw, previewContainer) {
