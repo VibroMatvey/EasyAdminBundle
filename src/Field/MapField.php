@@ -61,4 +61,25 @@ final class MapField implements FieldInterface
 
         return $this;
     }
+
+    public function hidePoints(bool $hide): self
+    {
+        $this->setFormTypeOption('hidePoints', $hide);
+
+        return $this;
+    }
+
+    public function hideAreas(bool $hide): self
+    {
+        $this->setFormTypeOption('hideAreas', $hide);
+
+        return $this;
+    }
+
+    public function hideYouAreHere(bool $hide): self
+    {
+        $this->setFormTypeOption('hideYouAreHere', $hide);
+
+        return $this;
+    }
 }

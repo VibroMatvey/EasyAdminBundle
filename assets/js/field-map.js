@@ -109,6 +109,10 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             this.modal.querySelector('#confirmObject')?.addEventListener('click', () => this.handleObjectConfirm());
             this.modal.querySelector('#cancelObject')?.addEventListener('click', () => this.handleObjectCancel());
+
+            this.modal.addEventListener('hidden.bs.modal', () => {
+                this.handleObjectCancel();
+            });
         }
 
         populateObjectSelect() {
@@ -279,9 +283,15 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const areasButton = this.createModeButton('Область', 'areas');
             const youAreHereButton = this.createModeButton('Вы здесь', 'youAreHere');
 
-            buttonContainer.appendChild(pointsButton);
-            buttonContainer.appendChild(areasButton);
-            buttonContainer.appendChild(youAreHereButton);
+            if (this.domCache.pointsField.getAttribute('map-data-hide')) {
+                buttonContainer.appendChild(pointsButton);
+            }
+            if (this.domCache.areasField.getAttribute('map-data-hide')) {
+                buttonContainer.appendChild(areasButton);
+            }
+            if (this.domCache.youAreHereField.getAttribute('map-data-hide')) {
+                buttonContainer.appendChild(youAreHereButton);
+            }
             this.domCache.imageContainer.insertBefore(buttonContainer, mapContainer);
         }
 
@@ -632,7 +642,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     this.youAreHerePoint = null;
                     draw();
                     this.saveState(imageId);
-                    return;
                 }
             } else {
                 // Создаем новую точку "Вы здесь"

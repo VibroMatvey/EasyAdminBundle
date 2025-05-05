@@ -88,7 +88,8 @@ class MapFormType extends AbstractType
                 'attr' => [
                     'value' => $options['points'],
                     'mapped' => false,
-                    'map-data-id' => 'points'
+                    'map-data-id' => 'points',
+                    'map-data-hide' => !$options['hidePoints'],
                 ],
             ])
             ->add('areas', HiddenType::class, [
@@ -96,7 +97,8 @@ class MapFormType extends AbstractType
                 'attr' => [
                     'value' => $options['areas'],
                     'mapped' => false,
-                    'map-data-id' => 'areas'
+                    'map-data-id' => 'areas',
+                    'map-data-hide' => !$options['hideAreas'],
                 ],
             ])
             ->add('objects', HiddenType::class, [
@@ -110,7 +112,8 @@ class MapFormType extends AbstractType
             ->add('youAreHere', HiddenType::class, [
                 'required' => false,
                 'attr' => [
-                    'map-data-id' => 'youAreHere'
+                    'map-data-hide' => !$options['hideYouAreHere'],
+                    'map-data-id' => 'youAreHere',
                 ],
             ])
             ->add('file', FileUploadType::class, [
@@ -131,6 +134,9 @@ class MapFormType extends AbstractType
             'objectIdentifierPropertyName' => null,
             'objectMapPropertyName' => null,
             'mapObjectsPropertyName' => null,
+            'hidePoints' => false,
+            'hideAreas' => false,
+            'hideYouAreHere' => false,
             'objectRepository' => null,
             'points' => null,
             'areas' => null,
@@ -141,5 +147,8 @@ class MapFormType extends AbstractType
         $resolver->setAllowedTypes('objectMapPropertyName', ['null', 'string']);
         $resolver->setAllowedTypes('mapObjectsPropertyName', ['null', 'string']);
         $resolver->setAllowedTypes('objectIdentifierPropertyName', ['null', 'string', 'int']);
+        $resolver->setAllowedTypes('hidePoints', ['null', 'bool']);
+        $resolver->setAllowedTypes('hideAreas', ['null', 'bool']);
+        $resolver->setAllowedTypes('hideYouAreHere', ['null', 'bool']);
     }
 }
