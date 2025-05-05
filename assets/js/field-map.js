@@ -11,6 +11,15 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.pendingArea = null;
             this.youAreHerePoint = null;
             this.domCache = {};
+            this.scale = 1; // Начальный масштаб
+            this.originX = 0; // Смещение по X
+            this.originY = 0; // Смещение по Y
+            this.isDragging = false; // Флаг перетаскивания
+            this.hasDragged = false; // Флаг, указывающий, было ли перемещение
+            this.startX = 0; // Начало перетаскивания X
+            this.startY = 0; // Начало перетаскивания Y
+            this.mouseDownX = 0; // Координата X при mousedown
+            this.mouseDownY = 0; // Координата Y при mousedown
             this.init();
         }
 
@@ -246,7 +255,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const previewContainer = this.createPreviewContainer();
             const img = new Image();
-            img.src = `/uploads/maps/${filename}`;
+            img.src = `/Uploads/maps/${filename}`;
             img.onload = () => {
                 this.processImage(img, mapContainer, previewContainer);
                 this.createModeButtons(mapContainer);
@@ -258,7 +267,10 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const previewContainer = document.createElement('div');
             Object.assign(previewContainer.style, {
                 marginTop: '16px',
-                position: 'relative'
+                position: 'relative',
+                overflow: 'hidden',
+                width: '100%',
+                height: '600px'
             });
             return previewContainer;
         }
@@ -317,6 +329,28 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             });
         }
 
+        zoom(zoomFactor, canvas, mouseX, mouseY) {
+            const newScale = this.scale * zoomFactor;
+            if (newScale < 0.1 || newScale > 10) return; // Ограничение масштаба
+
+            // Корректировка смещения для масштабирования относительно курсора
+            const prevScale = this.scale;
+            this.scale = newScale;
+            this.originX = mouseX - (mouseX - this.originX) * (newScale / prevScale);
+            this.originY = mouseY - (mouseY - this.originY) * (newScale / prevScale);
+
+            // Обновление стилей изображения
+            const wrapper = canvas.parentElement;
+            const img = wrapper.querySelector('img');
+            if (img) {
+                img.style.transform = `scale(${this.scale}) translate(${this.originX / this.scale}px, ${this.originY / this.scale}px)`;
+                img.style.transformOrigin = '0 0';
+            }
+
+            const draw = canvas.drawFunction;
+            if (draw) draw();
+        }
+
         handleFileInput(event) {
             const files = event.target.files;
             if (!files?.length) {
@@ -342,6 +376,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.areas.clear();
             this.selectedObjects.clear();
             this.youAreHerePoint = null;
+            this.scale = 1;
+            this.originX = 0;
+            this.originY = 0;
 
             Array.from(files).forEach(file => {
                 if (file.type.startsWith('image/')) {
@@ -369,6 +406,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.areas.set(imageId, []);
 
             const draw = this.createDrawFunction(canvas, imageId);
+            canvas.drawFunction = draw;
             this.loadSavedData(imageId, draw, previewContainer);
             this.setupCanvasEvents(canvas, imageId, draw, previewContainer);
 
@@ -376,6 +414,10 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             wrapper.appendChild(canvas);
             previewContainer.appendChild(wrapper);
             mapContainer.appendChild(previewContainer);
+
+            // Устанавливаем размеры canvas после добавления в DOM
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
 
             draw();
         }
@@ -445,28 +487,32 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const wrapper = document.createElement('div');
             Object.assign(wrapper.style, {
                 position: 'relative',
-                width: `${img.naturalWidth}px`,
-                height: `${img.naturalHeight}px`
+                width: '100%',
+                height: '600px'
             });
 
             Object.assign(previewContainer.style, {
-                width: `${img.naturalWidth}px`,
-                height: `${img.naturalHeight}px`
+                width: '100%',
+                height: '600px'
             });
 
             Object.assign(img.style, {
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain'
-            });
-
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            Object.assign(canvas.style, {
+                objectFit: 'contain',
                 position: 'absolute',
                 top: '0',
                 left: '0'
+            });
+
+            const canvas = document.createElement('canvas');
+            Object.assign(canvas.style, {
+                position: 'absolute',
+                top: '0',
+                left: '0',
+                width: '100%',
+                height: '600px',
+                zIndex: '1'
             });
 
             return {wrapper, canvas};
@@ -476,25 +522,30 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             return () => {
                 const ctx = canvas.getContext('2d');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
 
+                // Масштабирование и смещение
+                ctx.scale(this.scale, this.scale);
+                ctx.translate(this.originX / this.scale, this.originY / this.scale);
+
+                // Рисуем точки
                 if (this.drawMode === 'points' || this.points.get(imageId).length) {
                     this.points.get(imageId).forEach(point => {
                         ctx.beginPath();
-                        ctx.arc(point.x, point.y, 5, 0, 2 * Math.PI);
+                        ctx.arc(point.x, point.y, 5 / this.scale, 0, 2 * Math.PI);
                         ctx.fillStyle = 'red';
                         ctx.fill();
-                        ctx.strokeStyle = 'black';
-                        ctx.stroke();
 
                         if (point.objectName) {
-                            ctx.font = '12px Arial';
+                            ctx.font = `${12 / this.scale}px Arial`;
                             ctx.fillStyle = 'black';
-                            ctx.fillText(point.objectName, point.x + 8, point.y - 8);
+                            ctx.fillText(point.objectName, point.x + 8 / this.scale, point.y - 8 / this.scale);
                             console.debug(`Rendering point with name: ${point.objectName}`);
                         }
                     });
                 }
 
+                // Рисуем области
                 if (this.drawMode === 'areas' || this.areas.get(imageId).length) {
                     this.areas.get(imageId).forEach(area => {
                         const points = area.points || [];
@@ -512,34 +563,35 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
                             points.forEach(point => {
                                 ctx.beginPath();
-                                ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+                                ctx.arc(point.x, point.y, 3 / this.scale, 0, 2 * Math.PI);
                                 ctx.fillStyle = 'blue';
                                 ctx.fill();
                             });
 
                             if (area.objectName && points.length) {
-                                ctx.font = '12px Arial';
+                                ctx.font = `${12 / this.scale}px Arial`;
                                 ctx.fillStyle = 'black';
-                                ctx.fillText(area.objectName, points[0].x + 8, points[0].y - 8);
+                                ctx.fillText(area.objectName, points[0].x + 8 / this.scale, points[0].y - 8 / this.scale);
                                 console.debug(`Rendering area with name: ${area.objectName}`);
                             }
                         }
                     });
                 }
 
+                // Рисуем точку "Вы здесь"
                 if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
                     ctx.beginPath();
-                    ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7, 0, 2 * Math.PI);
+                    ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7 / this.scale, 0, 2 * Math.PI);
                     ctx.fillStyle = 'green';
                     ctx.fill();
-                    ctx.strokeStyle = 'black';
-                    ctx.stroke();
 
-                    ctx.font = '14px Arial';
+                    ctx.font = `${14 / this.scale}px Arial`;
                     ctx.fillStyle = 'black';
-                    ctx.fillText('Вы здесь', this.youAreHerePoint.x + 10, this.youAreHerePoint.y - 10);
+                    ctx.fillText('Вы здесь', this.youAreHerePoint.x + 10 / this.scale, this.youAreHerePoint.y - 10 / this.scale);
                     console.debug('Rendering You Are Here point');
                 }
+
+                ctx.restore();
             };
         }
 
@@ -572,6 +624,10 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
         setupCanvasEvents(canvas, imageId, draw, previewContainer) {
             canvas.addEventListener('click', (event) => {
+                if (this.hasDragged) {
+                    this.hasDragged = false; // Сбрасываем флаг после проверки
+                    return; // Пропускаем клик, если было перемещение
+                }
                 event.stopPropagation();
                 const {x, y} = this.getCanvasCoordinates(event, canvas);
                 if (this.drawMode === 'points') {
@@ -595,6 +651,60 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 }
             });
 
+            canvas.addEventListener('wheel', (event) => {
+                if (!event.ctrlKey) return; // Зум только с зажатым Ctrl
+                event.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+                const zoomFactor = event.deltaY < 0 ? 1.1 : 0.9;
+                this.zoom(zoomFactor, canvas, mouseX, mouseY);
+            });
+
+            canvas.addEventListener('mousedown', (event) => {
+                if (event.button === 0 && event.ctrlKey) { // Перетаскивание только с Ctrl
+                    this.isDragging = true;
+                    this.mouseDownX = event.clientX;
+                    this.mouseDownY = event.clientY;
+                    const rect = canvas.getBoundingClientRect();
+                    this.startX = (event.clientX - rect.left) - this.originX;
+                    this.startY = (event.clientY - rect.top) - this.originY;
+                }
+            });
+
+            canvas.addEventListener('mousemove', (event) => {
+                if (this.isDragging) {
+                    this.hasDragged = true; // Устанавливаем флаг перемещения
+                    const rect = canvas.getBoundingClientRect();
+                    this.originX = (event.clientX - rect.left) - this.startX;
+                    this.originY = (event.clientY - rect.top) - this.startY;
+                    const wrapper = canvas.parentElement;
+                    const img = wrapper.querySelector('img');
+                    if (img) {
+                        img.style.transform = `scale(${this.scale}) translate(${this.originX / this.scale}px, ${this.originY / this.scale}px)`;
+                        img.style.transformOrigin = '0 0';
+                    }
+                    draw();
+                }
+            });
+
+            canvas.addEventListener('mouseup', (event) => {
+                if (this.isDragging) {
+                    // Проверяем, было ли значительное перемещение
+                    const deltaX = Math.abs(event.clientX - this.mouseDownX);
+                    const deltaY = Math.abs(event.clientY - this.mouseDownY);
+                    if (deltaX > 5 || deltaY > 5) {
+                        this.hasDragged = true; // Считаем это перетаскиванием
+                    }
+                }
+                this.isDragging = false;
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                this.isDragging = false;
+                this.hasDragged = false; // Сбрасываем флаг при выходе курсора
+            });
+
             const outsideClickHandler = (event) => {
                 if (!canvas.contains(event.target) && this.drawMode === 'areas' && !this.modal.contains(event.target)) {
                     this.handleAreaModeRightClick(imageId, draw, previewContainer);
@@ -612,17 +722,16 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
         getCanvasCoordinates(event, canvas) {
             const rect = canvas.getBoundingClientRect();
-            return {
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top
-            };
+            const x = (event.clientX - rect.left - this.originX) / this.scale;
+            const y = (event.clientY - rect.top - this.originY) / this.scale;
+            return { x, y };
         }
 
         handlePointModeClick(imageId, x, y, draw, previewContainer) {
             const currentPoints = this.points.get(imageId);
             for (let i = 0; i < currentPoints.length; i++) {
                 const point = currentPoints[i];
-                if (Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2) < 10) {
+                if (Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2) < 10 / this.scale) {
                     if (point.objectId) this.selectedObjects.delete(point.objectId);
                     currentPoints.splice(i, 1);
                     draw();
@@ -637,14 +746,12 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
         handleYouAreHereClick(imageId, x, y, draw, previewContainer) {
             if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
-                // Если кликнули рядом с точкой "Вы здесь", удаляем её
-                if (Math.sqrt((this.youAreHerePoint.x - x) ** 2 + (this.youAreHerePoint.y - y) ** 2) < 10) {
+                if (Math.sqrt((this.youAreHerePoint.x - x) ** 2 + (this.youAreHerePoint.y - y) ** 2) < 10 / this.scale) {
                     this.youAreHerePoint = null;
                     draw();
                     this.saveState(imageId);
                 }
             } else {
-                // Создаем новую точку "Вы здесь"
                 this.youAreHerePoint = {x, y, imageId, draw, previewContainer};
                 draw();
                 this.saveState(imageId);
@@ -657,7 +764,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 const area = currentAreas[i];
                 const points = area.points || [];
                 for (let j = 0; j < points.length; j++) {
-                    if (Math.sqrt((points[j].x - x) ** 2 + (points[j].y - y) ** 2) < 10) {
+                    if (Math.sqrt((points[j].x - x) ** 2 + (points[j].y - y) ** 2) < 10 / this.scale) {
                         points.splice(j, 1);
                         area.points = points;
                         if (!points.length && area.objectId) {
