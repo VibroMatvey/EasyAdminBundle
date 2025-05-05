@@ -11,17 +11,17 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.pendingArea = null;
             this.youAreHerePoint = null;
             this.domCache = {};
-            this.scale = 1; // Масштаб отображения
-            this.originX = 0; // Смещение по X
-            this.originY = 0; // Смещение по Y
-            this.isDragging = false; // Флаг перетаскивания
-            this.hasDragged = false; // Флаг, указывающий, было ли перемещение
-            this.startX = 0; // Начало перетаскивания X
-            this.startY = 0; // Начало перетаскивания Y
-            this.mouseDownX = 0; // Координата X при mousedown
-            this.mouseDownY = 0; // Координата Y при mousedown
-            this.imageWidth = 0; // Натуральная ширина изображения
-            this.imageHeight = 0; // Натуральная высота изображения
+            this.scale = 1;
+            this.originX = 0;
+            this.originY = 0;
+            this.isDragging = false;
+            this.hasDragged = false;
+            this.startX = 0;
+            this.startY = 0;
+            this.mouseDownX = 0;
+            this.mouseDownY = 0;
+            this.imageWidth = 0;
+            this.imageHeight = 0;
             this.init();
         }
 
@@ -77,7 +77,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             });
 
             this.modal.innerHTML = `
-                <div class="modal-dialog fade show">
+                <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title" id="objectSelectModalLabel">Выберите объект</h5>
@@ -270,9 +270,8 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             Object.assign(previewContainer.style, {
                 marginTop: '16px',
                 position: 'relative',
-                overflow: 'hidden',
-                width: '100%',
-                height: '600px'
+                overflow: 'auto',
+                width: '100%'
             });
             return previewContainer;
         }
@@ -333,21 +332,24 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
         zoom(zoomFactor, canvas, mouseX, mouseY) {
             const newScale = this.scale * zoomFactor;
-            if (newScale < 0.1 || newScale > 10) return; // Ограничение масштаба
+            if (newScale < 0.1 || newScale > 10) return;
 
-            // Корректировка смещения для масштабирования относительно курсора
             const prevScale = this.scale;
             this.scale = newScale;
             this.originX = mouseX - (mouseX - this.originX) * (newScale / prevScale);
             this.originY = mouseY - (mouseY - this.originY) * (newScale / prevScale);
 
-            // Обновление стилей изображения
             const wrapper = canvas.parentElement;
             const img = wrapper.querySelector('img');
             if (img) {
                 img.style.transform = `scale(${this.scale}) translate(${this.originX / this.scale}px, ${this.originY / this.scale}px)`;
                 img.style.transformOrigin = '0 0';
             }
+
+            canvas.width = this.imageWidth * this.scale;
+            canvas.height = this.imageHeight * this.scale;
+            canvas.style.width = `${this.imageWidth * this.scale}px`;
+            canvas.style.height = `${this.imageHeight * this.scale}px`;
 
             const draw = canvas.drawFunction;
             if (draw) draw();
@@ -402,7 +404,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         }
 
         processImage(img, mapContainer, previewContainer) {
-            // Сохраняем натуральные размеры изображения
             this.imageWidth = img.naturalWidth;
             this.imageHeight = img.naturalHeight;
 
@@ -421,15 +422,15 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             previewContainer.appendChild(wrapper);
             mapContainer.appendChild(previewContainer);
 
-            // Устанавливаем размеры canvas после добавления в DOM
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-
-            // Начальный масштаб для соответствия высоте 600px
-            const scaleToFit = 600 / this.imageHeight;
+            const scaleToFit = Math.min(previewContainer.offsetWidth / this.imageWidth, 600 / this.imageHeight);
             this.scale = scaleToFit;
             img.style.transform = `scale(${this.scale}) translate(${this.originX / this.scale}px, ${this.originY / this.scale}px)`;
             img.style.transformOrigin = '0 0';
+
+            canvas.width = this.imageWidth * this.scale;
+            canvas.height = this.imageHeight * this.scale;
+            canvas.style.width = `${this.imageWidth * this.scale}px`;
+            canvas.style.height = `${this.imageHeight * this.scale}px`;
 
             draw();
         }
@@ -499,18 +500,19 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const wrapper = document.createElement('div');
             Object.assign(wrapper.style, {
                 position: 'relative',
-                width: '100%',
-                height: '600px'
+                width: `${this.imageWidth * this.scale}px`,
+                height: `${this.imageHeight * this.scale}px`
             });
 
             Object.assign(previewContainer.style, {
                 width: '100%',
-                height: '600px'
+                height: 'auto',
+                overflow: 'auto'
             });
 
             Object.assign(img.style, {
-                width: '100%',
-                height: '100%',
+                width: `${this.imageWidth}px`,
+                height: `${this.imageHeight}px`,
                 objectFit: 'contain',
                 position: 'absolute',
                 top: '0',
@@ -522,8 +524,8 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 position: 'absolute',
                 top: '0',
                 left: '0',
-                width: '100%',
-                height: '600px',
+                width: `${this.imageWidth * this.scale}px`,
+                height: `${this.imageHeight * this.scale}px`,
                 zIndex: '1'
             });
 
@@ -536,31 +538,25 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.save();
 
-                // Масштабирование и смещение для соответствия изображению
-                const scaleX = canvas.width / this.imageWidth;
-                const scaleY = canvas.height / this.imageHeight;
-                const imageScale = Math.min(scaleX, scaleY) * this.scale;
-                ctx.scale(imageScale, imageScale);
-                ctx.translate(this.originX / imageScale, this.originY / imageScale);
+                ctx.scale(this.scale, this.scale);
+                ctx.translate(this.originX / this.scale, this.originY / this.scale);
 
-                // Рисуем точки
                 if (this.drawMode === 'points' || this.points.get(imageId).length) {
                     this.points.get(imageId).forEach(point => {
                         ctx.beginPath();
-                        ctx.arc(point.x, point.y, 5 / imageScale, 0, 2 * Math.PI);
+                        ctx.arc(point.x, point.y, 5 / this.scale, 0, 2 * Math.PI);
                         ctx.fillStyle = 'red';
                         ctx.fill();
 
                         if (point.objectName) {
-                            ctx.font = `${12 / imageScale}px Arial`;
+                            ctx.font = `${12 / this.scale}px Arial`;
                             ctx.fillStyle = 'black';
-                            ctx.fillText(point.objectName, point.x + 8 / imageScale, point.y - 8 / imageScale);
+                            ctx.fillText(point.objectName, point.x + 8 / this.scale, point.y - 8 / this.scale);
                             console.debug(`Rendering point with name: ${point.objectName}`);
                         }
                     });
                 }
 
-                // Рисуем области
                 if (this.drawMode === 'areas' || this.areas.get(imageId).length) {
                     this.areas.get(imageId).forEach(area => {
                         const points = area.points || [];
@@ -578,31 +574,30 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
                             points.forEach(point => {
                                 ctx.beginPath();
-                                ctx.arc(point.x, point.y, 3 / imageScale, 0, 2 * Math.PI);
+                                ctx.arc(point.x, point.y, 3 / this.scale, 0, 2 * Math.PI);
                                 ctx.fillStyle = 'blue';
                                 ctx.fill();
                             });
 
                             if (area.objectName && points.length) {
-                                ctx.font = `${12 / imageScale}px Arial`;
+                                ctx.font = `${12 / this.scale}px Arial`;
                                 ctx.fillStyle = 'black';
-                                ctx.fillText(area.objectName, points[0].x + 8 / imageScale, points[0].y - 8 / imageScale);
+                                ctx.fillText(area.objectName, points[0].x + 8 / this.scale, points[0].y - 8 / this.scale);
                                 console.debug(`Rendering area with name: ${area.objectName}`);
                             }
                         }
                     });
                 }
 
-                // Рисуем точку "Вы здесь"
                 if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
                     ctx.beginPath();
-                    ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7 / imageScale, 0, 2 * Math.PI);
+                    ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7 / this.scale, 0, 2 * Math.PI);
                     ctx.fillStyle = 'green';
                     ctx.fill();
 
-                    ctx.font = `${14 / imageScale}px Arial`;
+                    ctx.font = `${14 / this.scale}px Arial`;
                     ctx.fillStyle = 'black';
-                    ctx.fillText('Вы здесь', this.youAreHerePoint.x + 10 / imageScale, this.youAreHerePoint.y - 10 / imageScale);
+                    ctx.fillText('Вы здесь', this.youAreHerePoint.x + 10 / this.scale, this.youAreHerePoint.y - 10 / this.scale);
                     console.debug('Rendering You Are Here point');
                 }
 
@@ -633,15 +628,15 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             this.domCache.pointsField.value = JSON.stringify(state.points);
             this.domCache.areasField.value = JSON.stringify(state.areas);
             if (this.domCache.youAreHereField) {
-                this.domCache.youAreHereField.value = JSON.stringify(state.youAreHere);
+                this.domCache.youAreHereField.value = JSON.stringify(state.youAreHere || {});
             }
         }
 
         setupCanvasEvents(canvas, imageId, draw, previewContainer) {
             canvas.addEventListener('click', (event) => {
                 if (this.hasDragged) {
-                    this.hasDragged = false; // Сбрасываем флаг после проверки
-                    return; // Пропускаем клик, если было перемещение
+                    this.hasDragged = false;
+                    return;
                 }
                 event.stopPropagation();
                 const {x, y} = this.getCanvasCoordinates(event, canvas);
@@ -667,7 +662,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             });
 
             canvas.addEventListener('wheel', (event) => {
-                if (!event.ctrlKey) return; // Зум только с зажатым Ctrl
+                if (!event.ctrlKey) return;
                 event.preventDefault();
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = event.clientX - rect.left;
@@ -677,7 +672,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             });
 
             canvas.addEventListener('mousedown', (event) => {
-                if (event.button === 0 && event.ctrlKey) { // Перетаскивание только с Ctrl
+                if (event.button === 0 && event.ctrlKey) {
                     this.isDragging = true;
                     this.mouseDownX = event.clientX;
                     this.mouseDownY = event.clientY;
@@ -689,7 +684,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             canvas.addEventListener('mousemove', (event) => {
                 if (this.isDragging) {
-                    this.hasDragged = true; // Устанавливаем флаг перемещения
+                    this.hasDragged = true;
                     const rect = canvas.getBoundingClientRect();
                     this.originX = (event.clientX - rect.left) - this.startX;
                     this.originY = (event.clientY - rect.top) - this.startY;
@@ -705,11 +700,10 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             canvas.addEventListener('mouseup', (event) => {
                 if (this.isDragging) {
-                    // Проверяем, было ли значительное перемещение
                     const deltaX = Math.abs(event.clientX - this.mouseDownX);
                     const deltaY = Math.abs(event.clientY - this.mouseDownY);
                     if (deltaX > 5 || deltaY > 5) {
-                        this.hasDragged = true; // Считаем это перетаскиванием
+                        this.hasDragged = true;
                     }
                 }
                 this.isDragging = false;
@@ -717,7 +711,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             canvas.addEventListener('mouseleave', () => {
                 this.isDragging = false;
-                this.hasDragged = false; // Сбрасываем флаг при выходе курсора
+                this.hasDragged = false;
             });
 
             const outsideClickHandler = (event) => {
@@ -737,19 +731,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
         getCanvasCoordinates(event, canvas) {
             const rect = canvas.getBoundingClientRect();
-            const canvasWidth = canvas.width;
-            const canvasHeight = canvas.height;
-
-            // Вычисляем масштаб изображения относительно его натуральных размеров
-            const scaleX = canvasWidth / this.imageWidth;
-            const scaleY = canvasHeight / this.imageHeight;
-            const imageScale = Math.min(scaleX, scaleY);
-
-            // Преобразуем координаты мыши в координаты изображения
-            const x = ((event.clientX - rect.left) - this.originX) / (imageScale * this.scale);
-            const y = ((event.clientY - rect.top) - this.originY) / (imageScale * this.scale);
-
-            return { x, y };
+            const x = (event.clientX - rect.left - this.originX) / this.scale;
+            const y = (event.clientY - rect.top - this.originY) / this.scale;
+            return {x, y};
         }
 
         handlePointModeClick(imageId, x, y, draw, previewContainer) {

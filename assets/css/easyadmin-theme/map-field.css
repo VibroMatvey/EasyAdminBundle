@@ -1,18 +1,21 @@
 .map-image {
     position: relative;
 }
+
 .map-content {
     position: relative;
     width: 100%;
 }
+
 .map-content canvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-    height: 600px;
+    height: 100%;
     z-index: 1;
 }
+
 .map-content img {
     position: absolute;
     top: 0;
@@ -22,13 +25,15 @@
     object-fit: contain;
     transform-origin: 0 0;
 }
+
 .map-content .preview-container {
     width: 100%;
-    height: 600px;
+    height: 100%;
     position: relative;
 }
+
 .map-content .wrapper {
     width: 100%;
-    height: 600px;
+    height: 100%;
     position: relative;
 }
