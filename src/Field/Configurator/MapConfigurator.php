@@ -8,6 +8,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldConfiguratorInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\MapField;
+use Exception;
 use RuntimeException;
 use Symfony\Component\OptionsResolver\Exception\InvalidArgumentException;
 
@@ -95,21 +96,21 @@ final class MapConfigurator implements FieldConfiguratorInterface
 
     private function checkAvailableNaviService(string $url): bool
     {
-        $headers = [
-            'Accept: application/json',
-        ];
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url . "ping");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPGET, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        $response = curl_exec($ch);
-        if ($response === false) {
+        try {
+            $headers = [
+                'Accept: application/json',
+            ];
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url . "ping");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            return $httpCode == 200;
+        } catch (Exception) {
             return false;
-            curl_close($ch);
         }
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        return $httpCode == 200;
     }
 }
