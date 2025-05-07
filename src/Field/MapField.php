@@ -82,4 +82,18 @@ final class MapField implements FieldInterface
 
         return $this;
     }
+
+    public function hideRoads(bool $hide): self
+    {
+        $this->setFormTypeOption('hideRoads', $hide);
+
+        return $this;
+    }
+
+    public function setNaviServiceUrl(string $url): self
+    {
+        $this->setFormTypeOption('naviServiceUrl', $url);
+
+        return $this;
+    }
 }

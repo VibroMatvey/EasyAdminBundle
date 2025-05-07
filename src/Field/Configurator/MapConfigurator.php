@@ -8,17 +8,18 @@ use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldConfiguratorInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\MapField;
+use RuntimeException;
 use Symfony\Component\OptionsResolver\Exception\InvalidArgumentException;
 
 /**
- * @author Javier Eguiluz <javier.eguiluz@gmail.com>
+ * @author Vibro Matvey <vibromatvey@gmail.com>
  */
 final class MapConfigurator implements FieldConfiguratorInterface
 {
     private EntityManager $entityManager;
 
     public function __construct(
-        EntityManager $entityManager
+        EntityManager $entityManager,
     )
     {
         $this->entityManager = $entityManager;
@@ -32,6 +33,8 @@ final class MapConfigurator implements FieldConfiguratorInterface
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
         $map = $entityDto->getInstance();
+        $naviServiceUrl = $field->getFormTypeOption('naviServiceUrl');
+        $hideRoads = $field->getFormTypeOption('hideRoads');
         $objectTitlePropertyName = $field->getFormTypeOption('objectTitlePropertyName');
         $objectMapPropertyName = $field->getFormTypeOption('objectMapPropertyName');
         $mapObjectsPropertyName = $field->getFormTypeOption('mapObjectsPropertyName');
@@ -80,5 +83,33 @@ final class MapConfigurator implements FieldConfiguratorInterface
         $field->setFormTypeOptionIfNotSet('points', json_encode($points));
         $field->setFormTypeOptionIfNotSet('areas', json_encode($areas));
         $field->setFormTypeOptionIfNotSet('objects', json_encode($objects));
+        $field->setFormTypeOptionIfNotSet('roads', json_encode([]));
+
+        if ($hideRoads === null && $naviServiceUrl != null) {
+            $available = $this->checkAvailableNaviService($naviServiceUrl);
+            if (!$available) {
+                throw new RuntimeException("Navi service not available for $naviServiceUrl");
+            }
+        }
+    }
+
+    private function checkAvailableNaviService(string $url): bool
+    {
+        $headers = [
+            'Accept: application/json',
+        ];
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url . "ping");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPGET, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        $response = curl_exec($ch);
+        if ($response === false) {
+            return false;
+            curl_close($ch);
+        }
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        return $httpCode == 200;
     }
 }

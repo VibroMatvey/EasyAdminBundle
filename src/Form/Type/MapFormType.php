@@ -101,6 +101,15 @@ class MapFormType extends AbstractType
                     'map-data-hide' => !$options['hideAreas'],
                 ],
             ])
+            ->add('roads', HiddenType::class, [
+                'required' => false,
+                'attr' => [
+                    'value' => $options['roads'],
+                    'mapped' => false,
+                    'map-data-id' => 'roads',
+                    'map-data-hide' => !$options['hideRoads'],
+                ],
+            ])
             ->add('objects', HiddenType::class, [
                 'required' => false,
                 'attr' => [
@@ -137,11 +146,14 @@ class MapFormType extends AbstractType
             'hidePoints' => false,
             'hideAreas' => false,
             'hideYouAreHere' => false,
+            'hideRoads' => false,
+            'naviServiceUrl' => null,
             'objectRepository' => null,
             'points' => null,
             'areas' => null,
             'objects' => null,
             'map' => null,
+            'roads' => null,
         ]);
         $resolver->setAllowedTypes('objectTitlePropertyName', ['null', 'string']);
         $resolver->setAllowedTypes('objectMapPropertyName', ['null', 'string']);
@@ -150,5 +162,28 @@ class MapFormType extends AbstractType
         $resolver->setAllowedTypes('hidePoints', ['null', 'bool']);
         $resolver->setAllowedTypes('hideAreas', ['null', 'bool']);
         $resolver->setAllowedTypes('hideYouAreHere', ['null', 'bool']);
+        $resolver->setAllowedTypes('hideRoads', ['null', 'bool']);
+        $resolver->setAllowedTypes('naviServiceUrl', ['null', 'string']);
+    }
+
+    private function createRoads(array $roads, string $url)
+    {
+        $payload = json_encode($roads);
+
+        $ch = curl_init($url);
+
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($payload)
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        curl_exec($ch);
+
+        if (curl_errno($ch)) {
+            throw new \RuntimeException("Error: " . curl_error($ch));
+        }
     }
 }

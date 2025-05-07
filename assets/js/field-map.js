@@ -5,10 +5,12 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         constructor() {
             this.points = new Map();
             this.areas = new Map();
+            this.roads = new Map();
             this.drawMode = 'points';
             this.selectedObjects = new Set();
             this.pendingPoint = null;
             this.pendingArea = null;
+            this.pendingRoad = null;
             this.youAreHerePoint = null;
             this.domCache = {};
             this.scale = 1;
@@ -39,6 +41,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 fileInputs: document.querySelectorAll('[map-data-id="file"]'),
                 pointsField: document.querySelector('[map-data-id="points"]'),
                 areasField: document.querySelector('[map-data-id="areas"]'),
+                roadsField: document.querySelector('[map-data-id="roads"]'),
                 objectsField: document.querySelector('[map-data-id="objects"]'),
                 youAreHereField: document.querySelector('[map-data-id="youAreHere"]')
             };
@@ -257,7 +260,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const previewContainer = this.createPreviewContainer();
             const img = new Image();
-            img.src = `/uploads/maps/${filename}`;
+            img.src = `/Uploads/maps/${filename}`;
             img.onload = () => {
                 this.processImage(img, mapContainer, previewContainer);
                 this.createModeButtons(mapContainer);
@@ -294,15 +297,19 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const pointsButton = this.createModeButton('Точки', 'points');
             const areasButton = this.createModeButton('Область', 'areas');
+            const roadsButton = this.createModeButton('Дороги', 'roads');
             const youAreHereButton = this.createModeButton('Вы здесь', 'youAreHere');
 
-            if (this.domCache.pointsField.getAttribute('map-data-hide')) {
+            if (this.domCache.pointsField) {
                 buttonContainer.appendChild(pointsButton);
             }
-            if (this.domCache.areasField.getAttribute('map-data-hide')) {
+            if (this.domCache.areasField) {
                 buttonContainer.appendChild(areasButton);
             }
-            if (this.domCache.youAreHereField.getAttribute('map-data-hide')) {
+            if (this.domCache.roadsField) {
+                buttonContainer.appendChild(roadsButton);
+            }
+            if (this.domCache.youAreHereField) {
                 buttonContainer.appendChild(youAreHereButton);
             }
             this.domCache.imageContainer.insertBefore(buttonContainer, mapContainer);
@@ -324,7 +331,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         updateModeButtons() {
             const buttons = this.domCache.imageContainer?.querySelectorAll('.mode-buttons .btn');
             buttons?.forEach(button => {
-                const isActive = button.textContent === (this.drawMode === 'points' ? 'Точки' : this.drawMode === 'areas' ? 'Область' : 'Вы здесь');
+                const isActive = button.textContent === (this.drawMode === 'points' ? 'Точки' :
+                    this.drawMode === 'areas' ? 'Область' :
+                        this.drawMode === 'roads' ? 'Дороги' : 'Вы здесь');
                 button.classList.toggle('btn-primary', isActive);
                 button.classList.toggle('btn-secondary', !isActive);
             });
@@ -378,6 +387,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const previewContainer = this.createPreviewContainer();
             this.points.clear();
             this.areas.clear();
+            this.roads.clear();
             this.selectedObjects.clear();
             this.youAreHerePoint = null;
             this.scale = 1;
@@ -411,6 +421,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             const imageId = Date.now().toString();
             this.points.set(imageId, []);
             this.areas.set(imageId, []);
+            this.roads.set(imageId, []);
 
             const draw = this.createDrawFunction(canvas, imageId);
             canvas.drawFunction = draw;
@@ -478,6 +489,23 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     });
             } catch (error) {
                 this.handleError('Failed to parse Map_map_areas', error);
+            }
+
+            try {
+                const savedRoads = JSON.parse(this.domCache.roadsField?.value || '[]');
+                savedRoads.forEach(road => {
+                    if (road.from && road.to) {
+                        this.roads.get(imageId).push({
+                            from: { x: road.from.x, y: road.from.y },
+                            to: { x: road.to.x, y: road.to.y },
+                            imageId,
+                            draw,
+                            previewContainer
+                        });
+                    }
+                });
+            } catch (error) {
+                this.handleError('Failed to parse Map_map_roads', error);
             }
 
             try {
@@ -589,6 +617,27 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     });
                 }
 
+                if (this.drawMode === 'roads' || this.roads.get(imageId).length) {
+                    this.roads.get(imageId).forEach(road => {
+                        ctx.beginPath();
+                        ctx.moveTo(road.from.x, road.from.y);
+                        ctx.lineTo(road.to.x, road.to.y);
+                        ctx.strokeStyle = 'black';
+                        ctx.lineWidth = 2 / this.scale;
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(road.from.x, road.from.y, 3 / this.scale, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'black';
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(road.to.x, road.to.y, 3 / this.scale, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'black';
+                        ctx.fill();
+                    });
+                }
+
                 if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
                     ctx.beginPath();
                     ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7 / this.scale, 0, 2 * Math.PI);
@@ -606,8 +655,8 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         }
 
         saveState(imageId) {
-            if (!this.domCache.pointsField || !this.domCache.areasField) {
-                this.handleError('Map_map_points or Map_map_areas not found');
+            if (!this.domCache.pointsField || !this.domCache.areasField || !this.domCache.roadsField) {
+                this.handleError('Map_map_points, Map_map_areas, or Map_map_roads not found');
                 return;
             }
             const state = {
@@ -620,6 +669,10 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     points: area.points,
                     objectId: area.objectId
                 })),
+                roads: this.roads.get(imageId).map(road => ({
+                    from: { x: road.from.x, y: road.from.y },
+                    to: { x: road.to.x, y: road.to.y }
+                })),
                 youAreHere: this.youAreHerePoint && this.youAreHerePoint.imageId === imageId ? {
                     x: this.youAreHerePoint.x,
                     y: this.youAreHerePoint.y
@@ -627,6 +680,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             };
             this.domCache.pointsField.value = JSON.stringify(state.points);
             this.domCache.areasField.value = JSON.stringify(state.areas);
+            this.domCache.roadsField.value = JSON.stringify(state.roads);
             if (this.domCache.youAreHereField) {
                 this.domCache.youAreHereField.value = JSON.stringify(state.youAreHere || {});
             }
@@ -644,6 +698,8 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     this.handlePointModeClick(imageId, x, y, draw, previewContainer);
                 } else if (this.drawMode === 'areas') {
                     this.handleAreaModeClick(imageId, x, y);
+                } else if (this.drawMode === 'roads') {
+                    this.handleRoadModeClick(imageId, x, y, draw, previewContainer);
                 } else if (this.drawMode === 'youAreHere') {
                     this.handleYouAreHereClick(imageId, x, y, draw, previewContainer);
                 }
@@ -736,6 +792,46 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             return {x, y};
         }
 
+        findNearestRoadEndpoint(imageId, x, y, threshold = 25) {
+            const roads = this.roads.get(imageId);
+            let nearestPoint = null;
+            let minDistance = Infinity;
+
+            roads.forEach(road => {
+                const points = [
+                    { x: road.from.x, y: road.from.y },
+                    { x: road.to.x, y: road.to.y }
+                ];
+                points.forEach(point => {
+                    const distance = Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2);
+                    if (distance < threshold / this.scale && distance < minDistance) {
+                        minDistance = distance;
+                        nearestPoint = point;
+                    }
+                });
+            });
+
+            return nearestPoint;
+        }
+
+        distanceToSegment(px, py, x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const lengthSquared = dx * dx + dy * dy;
+
+            if (lengthSquared === 0) {
+                return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+            }
+
+            let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
+            t = Math.max(0, Math.min(1, t));
+
+            const projectionX = x1 + t * dx;
+            const projectionY = y1 + t * dy;
+
+            return Math.sqrt((px - projectionX) ** 2 + (py - projectionY) ** 2);
+        }
+
         handlePointModeClick(imageId, x, y, draw, previewContainer) {
             const currentPoints = this.points.get(imageId);
             for (let i = 0; i < currentPoints.length; i++) {
@@ -751,6 +847,48 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             this.pendingPoint = {x, y, imageId, draw, previewContainer};
             this.showModal();
+        }
+
+        handleRoadModeClick(imageId, x, y, draw, previewContainer) {
+            const currentRoads = this.roads.get(imageId);
+            const clickThreshold = 5 / this.scale; // Порог для удаления дороги по клику на линию
+
+            // Проверяем, попал ли клик на линию дороги
+            for (let i = 0; i < currentRoads.length; i++) {
+                const road = currentRoads[i];
+                const distance = this.distanceToSegment(
+                    x, y,
+                    road.from.x, road.from.y,
+                    road.to.x, road.to.y
+                );
+                if (distance < clickThreshold) {
+                    currentRoads.splice(i, 1);
+                    draw();
+                    this.saveState(imageId);
+                    return;
+                }
+            }
+
+            // Проверяем, попал ли клик по конечной точке (from или to)
+            const nearestPoint = this.findNearestRoadEndpoint(imageId, x, y);
+            const pointToUse = nearestPoint ? { x: nearestPoint.x, y: nearestPoint.y } : { x, y };
+
+            // Если нет pendingRoad, создаем новую дорогу с точкой from
+            if (!this.pendingRoad) {
+                this.pendingRoad = {
+                    from: pointToUse,
+                    imageId,
+                    draw,
+                    previewContainer
+                };
+            } else {
+                // Устанавливаем точку to и завершаем дорогу
+                this.pendingRoad.to = pointToUse;
+                currentRoads.push(this.pendingRoad);
+                this.pendingRoad = null;
+                draw();
+                this.saveState(imageId);
+            }
         }
 
         handleYouAreHereClick(imageId, x, y, draw, previewContainer) {
