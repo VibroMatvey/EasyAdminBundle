@@ -54,6 +54,7 @@ class MapFormType extends AbstractType
 
                 $points = json_decode($map['points'], true);
                 $areas = json_decode($map['areas'], true);
+                $roads = json_decode($map['roads'], true);
 
                 foreach ($points as $point) {
                     if (!$point['objectId']) {
@@ -81,6 +82,7 @@ class MapFormType extends AbstractType
                     $mapObject->setArea($area['points']);
                     $mapObject->$mapSetter($options['map']);
                 }
+                $this->createRoads($roads, $options['naviServiceUrl']);
             });
         $builder
             ->add('points', HiddenType::class, [
@@ -135,6 +137,29 @@ class MapFormType extends AbstractType
             ]);
     }
 
+    private function createRoads(array $roads, string $url)
+    {
+        $data = array_map(fn($road) => ["start" => $road["from"], "end" => $road['to']], $roads);
+        $payload = json_encode($data);
+
+        $fullUrl = rtrim($url, '/') . '/' . "points/batch-create";
+        $ch = curl_init($fullUrl);
+
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($payload)
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        curl_exec($ch);
+
+        if (curl_errno($ch)) {
+            throw new \RuntimeException("Error: " . curl_error($ch));
+        }
+    }
+
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
@@ -164,26 +189,5 @@ class MapFormType extends AbstractType
         $resolver->setAllowedTypes('hideYouAreHere', ['null', 'bool']);
         $resolver->setAllowedTypes('hideRoads', ['null', 'bool']);
         $resolver->setAllowedTypes('naviServiceUrl', ['null', 'string']);
-    }
-
-    private function createRoads(array $roads, string $url)
-    {
-        $payload = json_encode($roads);
-
-        $ch = curl_init($url);
-
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Content-Length: ' . strlen($payload)
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        curl_exec($ch);
-
-        if (curl_errno($ch)) {
-            throw new \RuntimeException("Error: " . curl_error($ch));
-        }
     }
 }
