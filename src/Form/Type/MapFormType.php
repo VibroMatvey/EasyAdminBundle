@@ -3,6 +3,7 @@
 namespace EasyCorp\Bundle\EasyAdminBundle\Form\Type;
 
 use EasyCorp\Bundle\EasyAdminBundle\Field\MapField;
+use RuntimeException;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Event\PreSubmitEvent;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
@@ -137,26 +138,70 @@ class MapFormType extends AbstractType
             ]);
     }
 
-    private function createRoads(array $roads, string $url)
+    /**
+     * Creates multiple roads via API batch-create endpoint.
+     *
+     * @param array $roads Array of roads, each with 'from' and 'to' keys
+     * @param string $url Base URL of the API
+     * @return array Decoded JSON response from the API
+     * @throws InvalidArgumentException If input data is invalid
+     * @throws RuntimeException If cURL request fails or API returns an error
+     */
+    private function createRoads(array $roads, string $url): void
     {
-        $data = array_map(fn($road) => ["start" => $road["from"], "end" => $road['to']], $roads);
+        if (empty($roads)) {
+            return;
+        }
+
+        $data = array_map(fn($road) => ['start' => $road['from'], 'end' => $road['to']], $roads);
         $payload = json_encode($data);
+        if ($payload === false) {
+            throw new \RuntimeException('Failed to encode roads data to JSON');
+        }
 
-        $fullUrl = rtrim($url, '/') . '/' . "points/batch-create";
-        $ch = curl_init($fullUrl);
+        $fullUrl = rtrim($url, '/') . '/roads/batch-create';
 
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Content-Length: ' . strlen($payload)
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $ch = curl_init();
+        try {
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $fullUrl,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $payload,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Content-Length: ' . strlen($payload),
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
 
-        curl_exec($ch);
+            $response = curl_exec($ch);
+            if ($response === false) {
+                $error = curl_error($ch);
+                $errno = curl_errno($ch);
+                throw new RuntimeException("cURL error: $error (Code: $errno)");
+            }
 
-        if (curl_errno($ch)) {
-            throw new \RuntimeException("Error: " . curl_error($ch));
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            if ($httpCode !== 200) {
+                throw new RuntimeException("API returned HTTP code $httpCode: $response");
+            }
+
+            $decoded = json_decode($response, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new RuntimeException('Invalid JSON response from API: ' . json_last_error_msg());
+            }
+
+            if (isset($decoded['error'])) {
+                throw new RuntimeException('API error: ' . $decoded['error']);
+            }
+        } catch (\Exception $e) {
+            throw new RuntimeException("Failed to create roads: {$e->getMessage()} for URL: $fullUrl");
+        } finally {
+            curl_close($ch);
         }
     }
 
