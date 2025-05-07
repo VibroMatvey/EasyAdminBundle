@@ -159,7 +159,7 @@ class MapFormType extends AbstractType
             throw new \RuntimeException('Failed to encode roads data to JSON');
         }
 
-        $fullUrl = rtrim($url, '/') . '/roads/batch-create';
+        $fullUrl = rtrim($url, '/') . '/api/v1/roads/batch-create';
 
         $ch = curl_init();
         try {
