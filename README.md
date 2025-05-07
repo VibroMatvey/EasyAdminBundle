@@ -11,8 +11,8 @@ Installation
 EasyAdmin 4 requires PHP 8.0.2 or higher and Symfony 5.4 or higher. Run the
 following command to install it in your application:
 
-```
-$ composer require easycorp/easyadmin-bundle
+```bash
+composer require easycorp/easyadmin-bundle
 ```
 
 Documentation

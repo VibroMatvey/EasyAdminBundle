@@ -375,10 +375,9 @@
                                 </section>
 
                                 {% block content_footer_wrapper %}
-                                    {% set content_footer = block('content_footer') is defined ? block('content_footer') : '' %}
-                                    {% if content_footer is not empty %}
+                                    {% if block('content_footer') is not empty %}
                                         <section class="content-footer">
-                                            {{ content_footer }}
+                                            {% block content_footer %}{% endblock %}
                                         </section>
                                     {% endif %}
                                 {% endblock %}

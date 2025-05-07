@@ -606,11 +606,6 @@ a.user-menu-wrapper .user-details:hover {
 }
 
 .content-footer {
-    background: var(--body-bg);
-    border-block-start: var(--border-width) var(--border-style) var(--content-section-border-color);
-    border-end-start-radius: var(--border-radius);
-    border-end-end-radius: var(--border-radius);
-    color: var(--text-muted);
     margin-block-start: 15px;
     padding: 15px 0;
 }
