@@ -8,7 +8,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldConfiguratorInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\MapField;
-use Exception;
 use RuntimeException;
 use Symfony\Component\OptionsResolver\Exception\InvalidArgumentException;
 
@@ -94,23 +93,58 @@ final class MapConfigurator implements FieldConfiguratorInterface
         }
     }
 
-    private function checkAvailableNaviService(string $url): bool
+    /**
+     * Проверяет доступность API-сервиса по указанному URL и эндпоинту.
+     *
+     * @param string $url Базовый URL сервиса
+     * @param string $endpoint Эндпоинт для проверки (по умолчанию 'ping')
+     * @return bool Возвращает true, если сервис доступен (HTTP 200 и валидный JSON)
+     */
+    private function checkAvailableNaviService(string $url, string $endpoint = 'ping'): bool
     {
+        $ch = curl_init();
         try {
-            $headers = [
-                'Accept: application/json',
-            ];
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url . "ping");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPGET, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            $fullUrl = rtrim($url, '/') . '/' . ltrim($endpoint, '/');
+
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $fullUrl,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPGET => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_HTTPHEADER => [
+                    'Accept: application/json',
+                ],
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
+
             $response = curl_exec($ch);
+
+            if ($response === false) {
+                throw new RuntimeException('cURL Error: ' . curl_error($ch) . ' (Code: ' . curl_errno($ch) . ')');
+            }
+
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            return $httpCode == 200;
-        } catch (Exception) {
-            return false;
+
+            if ($httpCode !== 200) {
+                throw new RuntimeException("API check failed: HTTP Code $httpCode for $fullUrl");
+            }
+
+            $decodedResponse = json_decode($response, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new RuntimeException('API check failed: Invalid JSON response from ' . $fullUrl);
+            }
+
+            if (isset($decodedResponse['status']) && $decodedResponse['status'] !== 'ok') {
+                throw new RuntimeException('API check failed: Status not OK in response from ' . $fullUrl);
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            throw new RuntimeException('API check exception: ' . $e->getMessage() . ' for ' . $url);
+        } finally {
+            curl_close($ch);
         }
     }
 }
