@@ -260,7 +260,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const previewContainer = this.createPreviewContainer();
             const img = new Image();
-            img.src = `/Uploads/maps/${filename}`;
+            img.src = `/uploads/maps/${filename}`;
             img.onload = () => {
                 this.processImage(img, mapContainer, previewContainer);
                 this.createModeButtons(mapContainer);
@@ -297,7 +297,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const pointsButton = this.createModeButton('Точки', 'points');
             const areasButton = this.createModeButton('Область', 'areas');
+            const roadsButton = this.createModeButton('Дороги', 'roads');
             const youAreHereButton = this.createModeButton('Вы здесь', 'youAreHere');
+            const deleteButton = this.createModeButton('Удалить', 'delete');
 
             if (this.domCache.pointsField) {
                 buttonContainer.appendChild(pointsButton);
@@ -305,9 +307,13 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             if (this.domCache.areasField) {
                 buttonContainer.appendChild(areasButton);
             }
+            if (this.domCache.roadsField) {
+                buttonContainer.appendChild(roadsButton);
+            }
             if (this.domCache.youAreHereField) {
                 buttonContainer.appendChild(youAreHereButton);
             }
+            buttonContainer.appendChild(deleteButton);
             this.domCache.imageContainer.insertBefore(buttonContainer, mapContainer);
         }
 
@@ -329,7 +335,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             buttons?.forEach(button => {
                 const isActive = button.textContent === (this.drawMode === 'points' ? 'Точки' :
                     this.drawMode === 'areas' ? 'Область' :
-                        this.drawMode === 'roads' ? 'Дороги' : 'Вы здесь');
+                        this.drawMode === 'roads' ? 'Дороги' :
+                            this.drawMode === 'youAreHere' ? 'Вы здесь' :
+                                'Удалить');
                 button.classList.toggle('btn-primary', isActive);
                 button.classList.toggle('btn-secondary', !isActive);
             });
@@ -565,11 +573,11 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 ctx.scale(this.scale, this.scale);
                 ctx.translate(this.originX / this.scale, this.originY / this.scale);
 
-                if (this.drawMode === 'points' || this.points.get(imageId).length) {
+                if (this.drawMode === 'points' || this.drawMode === 'delete' || this.points.get(imageId).length) {
                     this.points.get(imageId).forEach(point => {
                         ctx.beginPath();
                         ctx.arc(point.x, point.y, 5 / this.scale, 0, 2 * Math.PI);
-                        ctx.fillStyle = 'red';
+                        ctx.fillStyle = this.drawMode === 'delete' ? 'orange' : 'red';
                         ctx.fill();
 
                         if (point.objectName) {
@@ -581,7 +589,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     });
                 }
 
-                if (this.drawMode === 'areas' || this.areas.get(imageId).length) {
+                if (this.drawMode === 'areas' || this.drawMode === 'delete' || this.areas.get(imageId).length) {
                     this.areas.get(imageId).forEach(area => {
                         const points = area.points || [];
                         if (points.length) {
@@ -591,15 +599,15 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                                 ctx.lineTo(points[i].x, points[i].y);
                             }
                             if (area.completed) ctx.closePath();
-                            ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
+                            ctx.fillStyle = this.drawMode === 'delete' ? 'rgba(255, 165, 0, 0.3)' : 'rgba(0, 0, 255, 0.3)';
                             ctx.fill();
-                            ctx.strokeStyle = 'blue';
+                            ctx.strokeStyle = this.drawMode === 'delete' ? 'orange' : 'blue';
                             ctx.stroke();
 
                             points.forEach(point => {
                                 ctx.beginPath();
                                 ctx.arc(point.x, point.y, 3 / this.scale, 0, 2 * Math.PI);
-                                ctx.fillStyle = 'blue';
+                                ctx.fillStyle = this.drawMode === 'delete' ? 'orange' : 'blue';
                                 ctx.fill();
                             });
 
@@ -637,7 +645,7 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
                     ctx.beginPath();
                     ctx.arc(this.youAreHerePoint.x, this.youAreHerePoint.y, 7 / this.scale, 0, 2 * Math.PI);
-                    ctx.fillStyle = 'green';
+                    ctx.fillStyle = this.drawMode === 'delete' ? 'orange' : 'green';
                     ctx.fill();
 
                     ctx.font = `${14 / this.scale}px Arial`;
@@ -693,11 +701,13 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 if (this.drawMode === 'points') {
                     this.handlePointModeClick(imageId, x, y, draw, previewContainer);
                 } else if (this.drawMode === 'areas') {
-                    this.handleAreaModeClick(imageId, x, y);
+                    this.handleAreaModeClick(imageId, x, y, draw, previewContainer);
                 } else if (this.drawMode === 'roads') {
                     this.handleRoadModeClick(imageId, x, y, draw, previewContainer);
                 } else if (this.drawMode === 'youAreHere') {
                     this.handleYouAreHereClick(imageId, x, y, draw, previewContainer);
+                } else if (this.drawMode === 'delete') {
+                    this.handleDeleteModeClick(imageId, x, y, draw, previewContainer);
                 }
                 draw();
                 this.saveState(imageId);
@@ -829,27 +839,14 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         }
 
         handlePointModeClick(imageId, x, y, draw, previewContainer) {
-            const currentPoints = this.points.get(imageId);
-            for (let i = 0; i < currentPoints.length; i++) {
-                const point = currentPoints[i];
-                if (Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2) < 10 / this.scale) {
-                    if (point.objectId) this.selectedObjects.delete(point.objectId);
-                    currentPoints.splice(i, 1);
-                    draw();
-                    this.saveState(imageId);
-                    return;
-                }
-            }
-
             this.pendingPoint = {x, y, imageId, draw, previewContainer};
             this.showModal();
         }
 
         handleRoadModeClick(imageId, x, y, draw, previewContainer) {
             const currentRoads = this.roads.get(imageId);
-            const clickThreshold = 5 / this.scale; // Порог для удаления дороги по клику на линию
+            const clickThreshold = 5 / this.scale;
 
-            // Проверяем, попал ли клик на линию дороги
             for (let i = 0; i < currentRoads.length; i++) {
                 const road = currentRoads[i];
                 const distance = this.distanceToSegment(
@@ -865,11 +862,9 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                 }
             }
 
-            // Проверяем, попал ли клик по конечной точке (from или to)
             const nearestPoint = this.findNearestRoadEndpoint(imageId, x, y);
             const pointToUse = nearestPoint ? { x: nearestPoint.x, y: nearestPoint.y } : { x, y };
 
-            // Если нет pendingRoad, создаем новую дорогу с точкой from
             if (!this.pendingRoad) {
                 this.pendingRoad = {
                     from: pointToUse,
@@ -878,7 +873,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     previewContainer
                 };
             } else {
-                // Устанавливаем точку to и завершаем дорогу
                 this.pendingRoad.to = pointToUse;
                 currentRoads.push(this.pendingRoad);
                 this.pendingRoad = null;
@@ -888,42 +882,20 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
         }
 
         handleYouAreHereClick(imageId, x, y, draw, previewContainer) {
-            if (this.youAreHerePoint && this.youAreHerePoint.imageId === imageId) {
-                if (Math.sqrt((this.youAreHerePoint.x - x) ** 2 + (this.youAreHerePoint.y - y) ** 2) < 10 / this.scale) {
-                    this.youAreHerePoint = null;
-                    draw();
-                    this.saveState(imageId);
-                }
-            } else {
-                this.youAreHerePoint = {x, y, imageId, draw, previewContainer};
-                draw();
-                this.saveState(imageId);
-            }
+            this.youAreHerePoint = {x, y, imageId, draw, previewContainer};
+            draw();
+            this.saveState(imageId);
         }
 
-        handleAreaModeClick(imageId, x, y) {
+        handleAreaModeClick(imageId, x, y, draw, previewContainer) {
             const currentAreas = this.areas.get(imageId);
-            for (let i = 0; i < currentAreas.length; i++) {
-                const area = currentAreas[i];
-                const points = area.points || [];
-                for (let j = 0; j < points.length; j++) {
-                    if (Math.sqrt((points[j].x - x) ** 2 + (points[j].y - y) ** 2) < 10 / this.scale) {
-                        points.splice(j, 1);
-                        area.points = points;
-                        if (!points.length && area.objectId) {
-                            this.selectedObjects.delete(area.objectId);
-                            currentAreas.splice(i, 1);
-                        }
-                        return;
-                    }
-                }
-            }
-
             if (!currentAreas.length || currentAreas[currentAreas.length - 1].completed) {
-                currentAreas.push({points: [{x, y}], completed: false});
+                currentAreas.push({points: [{x, y}], completed: false, draw, previewContainer});
             } else {
                 currentAreas[currentAreas.length - 1].points.push({x, y});
             }
+            draw();
+            this.saveState(imageId);
         }
 
         handleAreaModeRightClick(imageId, draw, previewContainer) {
@@ -938,6 +910,48 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
                     currentAreas.splice(areaIndex, 1);
                     draw();
                     this.saveState(imageId);
+                }
+            }
+        }
+
+        isPointInPolygon(x, y, points) {
+            let inside = false;
+            for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+                const xi = points[i].x, yi = points[i].y;
+                const xj = points[j].x, yj = points[j].y;
+
+                const intersect = ((yi > y) !== (yj > y)) &&
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        handleDeleteModeClick(imageId, x, y, draw, previewContainer) {
+            // Delete entire area if click is inside
+            const currentAreas = this.areas.get(imageId);
+            for (let i = 0; i < currentAreas.length; i++) {
+                const area = currentAreas[i];
+                const points = area.points || [];
+                if (points.length && area.completed && this.isPointInPolygon(x, y, points)) {
+                    if (area.objectId) this.selectedObjects.delete(area.objectId);
+                    currentAreas.splice(i, 1);
+                    draw();
+                    this.saveState(imageId);
+                    return;
+                }
+            }
+
+            // Delete points
+            const currentPoints = this.points.get(imageId);
+            for (let i = 0; i < currentPoints.length; i++) {
+                const point = currentPoints[i];
+                if (Math.sqrt((point.x - x) ** 2 + (point.y - y) ** 2) < 10 / this.scale) {
+                    if (point.objectId) this.selectedObjects.delete(point.objectId);
+                    currentPoints.splice(i, 1);
+                    draw();
+                    this.saveState(imageId);
+                    return;
                 }
             }
         }
