@@ -878,8 +878,8 @@ contents to the ``<head>`` and/or ``<body>`` elements of the backend pages::
         ->addCssFiles('bundle/some-bundle/foo.css', 'some-custom-styles.css')
         ->addJsFiles('admin/some-custom-code.js')
         ->addWebpackEncoreEntry('admin-maps')
-        ->addHtmlContentToHead('<link rel="dns-prefetch" href="https://assets.example.com">')
-        ->addHtmlContentToBody('<!-- generated at '.time().' -->')
+        ->addHtmlContentsToHead('<link rel="dns-prefetch" href="https://assets.example.com">')
+        ->addHtmlContentsToBody('<!-- generated at '.time().' -->')
     ;
 
 By default, these web assets are loaded in all backend pages. If you need a more
