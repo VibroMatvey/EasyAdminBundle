@@ -83,7 +83,7 @@ class MapFormType extends AbstractType
                     $mapObject->setArea($area['points']);
                     $mapObject->$mapSetter($options['map']);
                 }
-                $this->createRoads($roads, $options['naviServiceUrl']);
+//                $this->createRoads($roads, $options['naviServiceUrl']);
             });
         $builder
             ->add('points', HiddenType::class, [

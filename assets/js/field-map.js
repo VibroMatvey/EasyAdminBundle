@@ -297,7 +297,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
 
             const pointsButton = this.createModeButton('Точки', 'points');
             const areasButton = this.createModeButton('Область', 'areas');
-            const roadsButton = this.createModeButton('Дороги', 'roads');
             const youAreHereButton = this.createModeButton('Вы здесь', 'youAreHere');
 
             if (this.domCache.pointsField) {
@@ -305,9 +304,6 @@ import TomSelect from "tom-select/dist/js/tom-select.complete.min";
             }
             if (this.domCache.areasField) {
                 buttonContainer.appendChild(areasButton);
-            }
-            if (this.domCache.roadsField) {
-                buttonContainer.appendChild(roadsButton);
             }
             if (this.domCache.youAreHereField) {
                 buttonContainer.appendChild(youAreHereButton);
